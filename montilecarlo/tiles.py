@@ -90,7 +90,7 @@ class MonteCarloTiles:
 
             return self.xyzs[pseudotile > 0]
 
-    def reinterpolate_tiles(self, tiles, sampled_var):
+    def reinterpolate_tiles(self, tiles, sampled_var, method='nearest'):
         """
         Given a set of sampled points, interpolate into a full
         2D array of data
@@ -100,7 +100,7 @@ class MonteCarloTiles:
             self.urxy[1] - self.tilebuffer:(self.urxy[1] + self.tileshape + self.tilebuffer)]
 
         grid = sci_grid(tiles[:, :2], sampled_var, (grid_x, grid_y),
-                        method='nearest')
+                        method=method)
 
         return np.rot90(grid.reshape(self.sampleshape))[
             self.tilebuffer:self.sampleshape[0] - self.tilebuffer,
@@ -146,4 +146,3 @@ class MonteCarloTiles:
                 ]
             }
         }
-
