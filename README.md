@@ -45,3 +45,4 @@ fig = figure(figsize=(10, 10))
 ax = fig.add_subplot(111)
 ax.imshow(MCT.reinterpolate_tiles(sampletiles, results[:, 0], method='cubic'))
 ```
+![](interpolate.png)
