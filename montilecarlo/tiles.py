@@ -12,9 +12,37 @@ log = logging.getLogger(__name__)
 
 class MonteCarloTiles:
     """
-    Use a monte-carlo type analysis to randomly sample tile data
+    Use random sampling on tiled data
+
+    Methods
+    -------
+    generate_tiles(rate=0.25, corners=True, method='random')
+        Create an array of [x, y, z] tiles based on a sampling rate
+    reinterpolate_tiles(tiles, sampled_var, method='nearest')
+        Given a set of sampled points, interpolate into a full
+        2D array of data
+    get_opts(self, count)
+        Return rasterio dataset creation options for the bounding tile.
+        Useful for writing output tiffs
+    get_geojson()
+        Return geojson of the bounding tile
     """
     def __init__(self, bounding_tile, zoom, tilebuffer=2):
+        """"
+        Parameters
+        ----------
+        bounding_tile: list
+            parent tile coordinate [{x}, {y}, {z}]
+            in which to perform the analysis
+        zoom: int
+            zoom level of tiles to sample
+        tilebuffer: int
+            sampling buffer in tile coordinate
+
+        Returns
+        -------
+        MonteCarloTiles class
+        """"
         self.bounding_tile = bounding_tile
         self.zoom = zoom
         self.zshift = zoom - bounding_tile[-1]
@@ -28,16 +56,31 @@ class MonteCarloTiles:
             list(np.indices(self.sampleshape, dtype=np.int64)) +
             [np.zeros(self.sampleshape, dtype=np.int64) + self.zoom])
 
-        # QUESTION: I think this is actuall the upper left, so should
-        # be ul not ur?
-        self.urxy = np.array([b * self.tileshape for b in bounding_tile[:2]])
+        self.ulxy = np.array([b * self.tileshape for b in bounding_tile[:2]])
 
-        self.xyzs[:, :, :2] += (self.urxy)
+        self.xyzs[:, :, :2] += (self.ulxy)
         self.xyzs[:, :, :2] -= self.tilebuffer
 
     def generate_tiles(self, rate=0.25, corners=True, method='random'):
         """
         Create an array of [x, y, z] tiles based on a sampling rate
+
+        Parameters
+        ----------
+        rate: float
+            Estimated proportion of tiles to sample
+        corners: bool
+            Sample at corner points
+        method: string (random|boxed)
+            Method for which to randomly create points
+            - random is a psuedorandom distribution
+            - boxed is a recursively randomly morphed grid
+
+        Returns
+        -------
+        tiles: ndarray
+            ndarray of shape (t, 3) of [{x}, {y}, {z}]
+            tile coordinates
         """
 
         if method == 'random':
@@ -94,10 +137,28 @@ class MonteCarloTiles:
         """
         Given a set of sampled points, interpolate into a full
         2D array of data
+
+        Parameters
+        ----------
+        tiles: ndarray
+            (n, 3) ndarray of [{x}, {y}, {z}]
+            tile coordinates
+        sampled_var: ndarray
+            (n, ) ndarray of sampled valuesd to reinterpolate
+        method: string
+            resampling method for interpolation
+            can be any type supported by scipy.interpolate.griddata
+            [DEFAULT="nearest"]
+
+        Returns
+        -------
+        interpolated: ndarray
+            (rows, cols) shape ndarray with interpolated result
+            shape will == 2 ** (zoom - parent_zoom)
         """
         grid_x, grid_y = np.mgrid[
-            self.urxy[0] - self.tilebuffer:(self.urxy[0] + self.tileshape + self.tilebuffer),
-            self.urxy[1] - self.tilebuffer:(self.urxy[1] + self.tileshape + self.tilebuffer)]
+            self.ulxy[0] - self.tilebuffer:(self.ulxy[0] + self.tileshape + self.tilebuffer),
+            self.ulxy[1] - self.tilebuffer:(self.ulxy[1] + self.tileshape + self.tilebuffer)]
 
         grid = sci_grid(tiles[:, :2], sampled_var, (grid_x, grid_y),
                         method=method)
@@ -107,7 +168,20 @@ class MonteCarloTiles:
             self.tilebuffer:self.sampleshape[0] - self.tilebuffer][::-1, :]
 
     def get_opts(self, count):
-        """Return rasterio dataset creation options for the bounding tile."""
+        """Return rasterio dataset creation options for the bounding tile.
+        Useful for writing output tiffs
+
+        Parameters
+        ----------
+        count: int
+            number of output bands
+
+        Returns
+        -------
+        opts: dict
+            dictionary suitable for input into rasterio.open(<>, 'w' **opts)
+            for writing output files
+        """
         w, s, e, n = list(mercantile.bounds(*self.bounding_tile))
 
         w, s = mercantile.xy(w, s)
@@ -127,7 +201,13 @@ class MonteCarloTiles:
             'crs': 'epsg:3857'}
 
     def get_geojson(self):
-        """Return geojson of the bounding tile."""
+        """Return geojson of the bounding tile.
+
+        Returns
+        -------
+        geojson: dict
+            GeoJSON of the bounding tile
+        """
         w, s, e, n = list(mercantile.bounds(*self.bounding_tile))
 
         return {
