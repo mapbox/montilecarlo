@@ -2,6 +2,17 @@
 
 Uses monte-carlo-ish sampling of tile data to interpolate across larger areas.
 
+## Installation
+
+### Installation from GitHub
+```bash
+$ git clone git@github.com:mapbox/montilecarlo.git
+$ cd montilecarlo
+$ pip install -e .
+```
+
+## Example API Usage
+
 ```python
 import os
 
@@ -19,7 +30,7 @@ sampling = 0.025
 sampletiles = MCT.generate_tiles(sampling, method='boxed')
 
 total_possible_tiles = 4 ** (zoom - tile[-1])
-print((sampling * total_possible_tiles, len(sampletiles)))
+# sampling * total_possible_tiles should ~= len(sampletiles)
 
 
 def get_weird(img):
@@ -31,10 +42,16 @@ def get_weird(img):
         grey[::a, ::b] for a, b in product([-1, 1], [-1, 1])
     ]), axis=2))
 
+# provide a list of functions to run;
+# each function should take a (depth, rows, cols)
+# ndarray and return a single numeric value
+runfunctions = [
+    get_weird
+]
 
 _, results = zip(*list(process_tiles(sampletiles,
                         os.environ['MAPBOX_ACCESS_TOKEN'],
-                        [get_weird],
+                        runfunctions,
                         mapid='mapbox.satellite',
                         fmt='jpg')))
 
