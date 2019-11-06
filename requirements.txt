@@ -9,7 +9,7 @@ mercantile==0.11.0
 multidict==3.3.0
 numpy==1.13.3
 olefile==0.44
-Pillow==4.3.0
+Pillow==6.2.0
 py==1.4.34
 scipy==0.19.1
 yarl==0.13.0
